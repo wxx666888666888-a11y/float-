@@ -1084,6 +1084,11 @@ const OfflineTextInputBar = memo(forwardRef<OfflineTextInputHandle, {
 }));
 
 export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
+    // ===== 临时补丁：定义缺失的函数和状态，防止登录崩溃 =====
+const showSwitchSessionList = useCallback(() => {}, []);
+const confirmCompressConversation = useCallback(() => {}, []);
+const [isCompressMode, setIsCompressMode] = useState(false);
+// ===== 补丁结束 ===== 
     const [liveCSS, setLiveCSS] = useState(session.customCSS || "");
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [transientMessages, setTransientMessages] = useState<ChatMessage[]>([]);

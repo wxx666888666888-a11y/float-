@@ -28,8 +28,8 @@ export function GET(request: NextRequest) {
     : preference === "standalone"
       ? {
           ...baseManifest,
-          display: isEdge ? "minimal-ui" : "standalone",
-          display_override: isEdge ? ["minimal-ui", "standalone"] : ["standalone", "minimal-ui"],
+          display: "standalone",
+          display_override: ["standalone", "minimal-ui", "fullscreen"],
           ...(isEdge ? { theme_color: "#f8f7f2" } : {}),
         }
       : isEdge

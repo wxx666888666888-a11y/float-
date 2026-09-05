@@ -52,7 +52,7 @@ import { useKeyboardDismissAutoSend } from "@/components/chat/use-keyboard-dismi
 import { cancelBailoutKey } from "@/lib/push-bailout-client";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import type { UserIdentity } from "@/components/settings/user-identity";
-import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X } from "lucide-react";
+import { AlertCircle, Blocks, Check, Trash2, User, ChevronLeft, ChevronRight, Clapperboard, Clock, Gift, Languages, Loader2, MoreHorizontal, X, PlusCircle, ArrowLeftRight, Archive, Minimize2 } from "lucide-react";
 import { setDebugChatState } from "@/lib/debug-store";
 import { SessionCustomCSS } from "@/components/ui/session-custom-css";
 import { setChatActive } from "@/lib/music-action-queue";
@@ -349,6 +349,8 @@ function hasActiveGenerationLock(sessionId: string): boolean {
 }
 
 function createGenerationRun(sessionId: string): ActiveGenerationRun {
+    // 【多对话管理】
+    // 新建对话时，可能会直接覆盖正在生成的任务
     const existing = activeGenerationRuns.get(sessionId);
     existing?.controller.abort();
     const run: ActiveGenerationRun = {
@@ -459,6 +461,8 @@ type ChatRoomProps = {
     onBack: () => void;
     /** 会话在设置页被删除后回调：由外层卸载本聊天室并回到列表 */
     onDeleted?: () => void;
+    /** 【多对话管理】切换其他会话时回调 */
+    onSwitchSession?: (sessionId: string) => void;
 };
 
 type OfflineActionTarget = {
@@ -662,6 +666,8 @@ const ChatTextInputBar = memo(forwardRef<ChatTextInputHandle, {
 }, ref) {
     const [inputText, setInputText] = useState("");
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    // 【多对话管理】控制时间戳显示的全局状态
+    const [showTimestamps, setShowTimestamps] = useState(false);
     // 表情包搜索联想：ESC/失焦置 true 隐藏，输入变化重新开启
     const [suggestClosed, setSuggestClosed] = useState(false);
     // 围观群/被禁言：输入与富媒体入口全部锁定，只留线下切换和生成按钮
@@ -3881,6 +3887,14 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
         if (shouldRunDeclineReply) await triggerReply();
     };
 
+    // 【多对话管理】切换对话分支
+    const handleSwitchConversation = () => {
+        if (onSwitchSession) {
+            // 通过外层传进来的方法打开切换浮层
+            onSwitchSession(session.id);
+        }
+    };
+
     // 收起键盘（或关掉表情/加号面板）并安静 N 秒后自动触发回复，
     // 等价于替用户点一次「触发回复」。判定全在 hook 内部，配置关掉后与手动模式一致。
     useKeyboardDismissAutoSend(wrapperRef, {
@@ -3937,6 +3951,17 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
     };
 
     const handleSendText = (text: string, options?: { autoReply?: boolean }): boolean => {
+        // 【多对话管理】
+        // 自动把第一条消息作为标题（如果是新对话）
+        if (messages.length === 0) {
+            const shortTitle = text.substring(0, 15) + (text.length > 15 ? "..." : "");
+            const sessions = loadChatSessions();
+            const idx = sessions.findIndex(s => s.id === session.id);
+            if (idx !== -1 && (!sessions[idx].title || sessions[idx].title === "新对话")) {
+                sessions[idx].title = shortTitle;
+                saveChatSessions(sessions);
+            }
+        }
         if (!ensureGroupSpeakPermission()) return false;
         if (isGenerating) {
             showChatToast("请先等待对方回复");
@@ -5664,11 +5689,19 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                     </div>
                 )}
                 {!offlineMode && hasMore && (
-                    <button
-                        type="button"
-                        className="chat-sys-msg chat-load-more-button"
-                        onClick={loadMore}
-                    >
+                    <div className="flex justify-center gap-2">
+                        <button
+                            type="button"
+                            className="chat-sys-msg chat-load-more-button"
+                            onClick={() => setShowTimestamps(!showTimestamps)}
+                        >
+                            <span>{showTimestamps ? '隐藏时间戳' : '显示时间戳'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="chat-sys-msg chat-load-more-button"
+                            onClick={loadMore}
+                        >
                         <span>查看更多消息</span>
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                             <polyline points="18 15 12 9 6 15" />
@@ -6197,7 +6230,33 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
             </div>
 
             {/* Input Bar — absolute at bottom, same layer as header */}
-            {isMultiSelectMode && !offlineMode && (
+            {/* 【多对话管理】压缩对话模式栏 */}
+            {isCompressMode && !offlineMode && (
+                <div className="chat-multi-select-bar chat-room-main-pane" data-ui="compress-mode">
+                    <button
+                        type="button"
+                        className="chat-multi-select-icon-btn"
+                        onClick={() => setIsCompressMode(false)}
+                        aria-label="取消压缩"
+                    >
+                        <X size={20} strokeWidth={1.8} />
+                    </button>
+                    <div className="chat-multi-select-summary">
+                        <strong>压缩当前对话</strong>
+                        <span>将生成摘要以节省 token</span>
+                    </div>
+                    <button
+                        type="button"
+                        className="chat-multi-select-delete-btn"
+                        style={{ backgroundColor: 'var(--c-primary)', color: 'white' }}
+                        onClick={confirmCompressConversation}
+                    >
+                        <Archive size={18} strokeWidth={1.8} />
+                        开始压缩
+                    </button>
+                </div>
+            )}
+            {isMultiSelectMode && !offlineMode && !isCompressMode && (
                 <div className="chat-multi-select-bar chat-room-main-pane" data-ui="multi-select">
                     <button
                         type="button"

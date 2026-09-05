@@ -5712,7 +5712,7 @@ const [isCompressMode, setIsCompressMode] = useState(false);
                             <polyline points="18 15 12 9 6 15" />
                         </svg>
                     </button>
-                )}
+                }
                 {!offlineMode && projectedMessages.map((msg, idx) => {
                     // ── Voice call group: collapsed widget ──
                     const vcGroup = voiceCallGroups.groups.find(g => g.startIdx === idx);

@@ -376,7 +376,7 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                         </div>
                     </div>
                 </div>
-            ))}
+            )}
             {activeMascot && (
                 <div className="chat-room-layer absolute inset-0">
                     <MascotChatRoom

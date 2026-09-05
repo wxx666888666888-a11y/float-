@@ -5707,7 +5707,7 @@ export function ChatRoom({ session, onBack, onDeleted }: ChatRoomProps) {
                             <polyline points="18 15 12 9 6 15" />
                         </svg>
                     </button>
-                    </div>
+                    
                 )}
                 {!offlineMode && projectedMessages.map((msg, idx) => {
                     // ── Voice call group: collapsed widget ──

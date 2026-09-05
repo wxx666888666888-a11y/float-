@@ -313,7 +313,68 @@ export const PhoneChatApp = memo(function PhoneChatApp({ onClose, initialSession
                             });
                             setActiveSession(null);
                         }}
+                        onSwitchSession={(sessionId) => {
+                            setShowSwitchSessionList(true);
+                        }}
                     />
+                </div>
+            ))}
+
+            {/* 【多对话管理】切换对话分支面板 */}
+            {showSwitchSessionList && activeSession && (
+                <div className="chat-custom-app-layer is-fullscreen" style={{ zIndex: 100 }}>
+                    <div className="chat-custom-app-shell" style={{ height: '100%', borderRadius: 0 }}>
+                        <div className="chat-custom-app-head flex justify-between px-4 py-3 border-b border-[var(--c-border)]" style={{ backgroundColor: 'var(--c-page-bg)' }}>
+                            <button className="ui-btn-text text-[var(--c-text-muted)]" onClick={() => setShowSwitchSessionList(false)}>
+                                取消
+                            </button>
+                            <span className="font-semibold text-[17px]">切换对话</span>
+                            <button className="ui-btn-text text-[var(--c-primary)] font-medium" onClick={() => {
+                                // 新建对话逻辑：完全相同的角色设定，但全新的从零开始的聊天记录
+                                const newTitle = prompt("请输入新对话标题：", "新对话");
+                                if (newTitle === null) return; // 用户取消
+
+                                const newId = `session-${Date.now()}`;
+                                const sessions = loadChatSessions();                                
+                                const newSession: ChatSession = {
+                                    id: newId,
+                                    contactId: activeSession.contactId, // 同一个角色
+                                    unreadCount: 0,
+                                    updatedAt: new Date().toISOString(),
+                                    isPinned: false,
+                                    isGroup: activeSession.isGroup,
+                                    title: newTitle || "新对话" // 用户自己起名，不消耗 token
+                                };
+                                saveChatSessions([newSession, ...sessions]);
+                                setShowSwitchSessionList(false);
+                                setActiveSession(newSession);
+                            }}>
+                                新建对话
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-3 overflow-y-auto" style={{ height: 'calc(100% - 56px)', backgroundColor: 'var(--c-page-bg)' }}>
+                            {loadChatSessions()
+                                .filter(s => s.contactId === activeSession.contactId && !s.isArchived)
+                                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                                .map(s => (
+                                    <div 
+                                        key={s.id} 
+                                        className={`p-4 rounded-xl border ${s.id === activeSession.id ? 'border-[var(--c-primary)] bg-[var(--c-primary)]/5 shadow-sm' : 'border-[var(--c-border)] bg-[var(--c-card)]'} cursor-pointer transition-colors active:opacity-70`}
+                                        onClick={() => {
+                                            setShowSwitchSessionList(false);
+                                            setActiveSession(s);
+                                        }}
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <div className="font-medium text-[15px] truncate flex-1">{s.title || "默认对话"}</div>
+                                            {s.id === activeSession.id && <span className="text-[10px] bg-[var(--c-primary)] text-white px-2 py-0.5 rounded-sm shrink-0 ml-2">当前</span>}
+                                        </div>
+                                        <div className="text-[12px] text-[var(--c-text-muted)]">最后记录：{new Date(s.updatedAt).toLocaleString()}</div>
+                                    </div>
+                                ))
+                            }
+                        </div>
+                    </div>
                 </div>
             ))}
             {activeMascot && (
